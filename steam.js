@@ -35,6 +35,10 @@ const GAMES = [
     dlc: ["Extra Pack"],
     achievements: ["初プレイ","全クリア"]
   }
+
+
+
+    
 ];
 /*
 使うときはid,img,pathを変えること。
