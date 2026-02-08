@@ -5,8 +5,8 @@ a{color:#66c0f4;text-decoration:none;margin:10px;display:inline-block}
 .card{background:#2a475e;padding:10px;border-radius:8px}
 /*.card img{width:100%;border-radius:6px}*/
 .card img{
-  width:200px;       /* 横幅固定 */
-  height:120px;      /* 高さ固定 */
+  width:66px;       /* 横幅固定 */
+  height:80px;      /* 高さ固定 */
   object-fit:cover;  /* 画像比率を維持して切り抜き */
   border-radius:4px;
   flex-shrink:0;
