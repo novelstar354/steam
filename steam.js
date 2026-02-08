@@ -259,7 +259,7 @@ function createLibraryDeck(container){
 function showAppBoot(){
   const div=document.createElement("div");
   div.className="appboot";
-  div.innerHTML=`<div class="ring"></div>STEAM`;
+  div.innerHTML=`<div class="ring"></div>STEAN`;
   document.body.appendChild(div);
   setTimeout(()=>{div.remove();},2800);
 }
