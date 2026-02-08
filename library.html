@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Library</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="appboot">
+  <div class="ring"></div>
+  STEAM
+</div>
+
+<header>STEAM LITE - LIBRARY</header>
+<a href="index.html">ストア</a>
+
+<div class="deck-grid" id="lib"></div>
+
+<script src="steam.js"></script>
+<script>
+const l=document.getElementById("lib");
+const o=owned();
+
+GAMES.forEach(g=>{
+ if(o.includes(g.id)){
+  const pt=(playtime()[g.id]||0);
+  const c=document.createElement("div");
+  c.className="deck-card";
+  c.innerHTML=`
+   <img src="${g.img}">
+   <h3>${g.title}</h3>
+   <div>プレイ時間 ${pt} 秒</div>
+   <button class="bigbtn" onclick="startGame('${g.id}')">▶ プレイ</button>
+  `;
+  l.appendChild(c);
+ }
+});
+</script>
+
+</body>
+</html>
