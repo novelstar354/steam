@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>PUZZLE BATTLE ULTIMATE</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+ <link rel="icon" href="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTJvJqCLAC_3NmwM-MLjFgXzsQFXsdzJtKQfg&s" sizes="16×16" type="image/png" />  
+<style>
+*{box-sizing:border-box;touch-action:none;}
+body{margin:0;background:#111;color:#fff;font-family:sans-serif;overflow:hidden;}
+#top{display:flex;justify-content:space-between;padding:6px;background:#222;font-size:14px;}
+.bar{width:110px;height:10px;background:#333;border-radius:10px;overflow:hidden}
+.bar>div{height:100%;background:linear-gradient(to right,#0f0,#6f6)}
+#enemyBar>div{background:linear-gradient(to right,#f33,#a00)}
+#timer{text-align:center;font-size:18px;margin:4px}
+#board{width:95vw;max-width:420px;height:360px;margin:auto;display:grid;grid-template-columns:repeat(6,1fr);grid-template-rows:repeat(5,1fr);gap:4px;}
+.orb{position: relative;width:100%;height:100%;border-radius:50%;backdrop-filter: blur(4px);background: rgba(255,255,255,0.15);box-shadow:inset 0 0 10px rgba(255,255,255,0.6), inset -6px -6px 10px rgba(0,0,0,0.3),0 4px 8px rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;font-size:26px;color:white;text-shadow:0 0 6px rgba(255,255,255,.8);transition:transform .1s, filter .1s;}
+.orb:active{transform:scale(0.92);filter:brightness(1.3);}
+.fire{background:linear-gradient(135deg,#ff5a5a,#ff9966);}
+.water{background:linear-gradient(135deg,#4facfe,#00f2fe);}
+.wood{background:linear-gradient(135deg,#43e97b,#38f9d7);}
+.light{background:linear-gradient(135deg,#fff7a1,#ffe066);}
+.dark{background:linear-gradient(135deg,#a18cd1,#6f42c1);}
+.orb::after{content:"";position:absolute;top:8%;left:12%;width:40%;height:40%;border-radius:50%;background:rgba(255,255,255,0.35);filter:blur(4px);}
+#combo{position:absolute;top:70px;width:100%;text-align:center;font-size:40px;color:gold;opacity:0;transition:.3s;}
+#turnText{position:fixed;top:40%;width:100%;text-align:center;font-size:48px;font-weight:bold;opacity:0;pointer-events:none;transition:.4s;}
+.turn-player{color:#4af;text-shadow:0 0 20px #4af;}
+.turn-enemy{color:#f44;text-shadow:0 0 20px #f44;}
+#effectText{position:fixed;top:120px;width:100%;text-align:center;font-size:32px;font-weight:bold;color:cyan;opacity:0;pointer-events:none;transition:0.5s;}
+#result{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;justify-content:center;align-items:center;text-align:center;}
+button{padding:10px 16px;border-radius:20px;border:none;background:#333;color:#fff;}
+#difficulty{position:fixed;inset:0;background:rgba(0,0,0,.9);display:flex;justify-content:center;align-items:center;flex-direction:column;}
+#difficulty button{margin:6px;padding:12px 24px;font-size:18px;}
+#skillBar{position:fixed;bottom:10px;width:100%;text-align:center;}
+.skillBtn{margin:0 6px;padding:8px 16px;border-radius:10px;border:none;background:#555;color:#fff;}
+#enemyAttrDisplay{margin-top:4px;font-size:12px;}
+</style>
+</head>
+<body>
+
+<div id="difficulty">
+  <h2>SELECT DIFFICULTY</h2>
+  <button onclick="startGame('easy')">EASY</button>
+  <button onclick="startGame('normal')">NORMAL</button>
+  <button onclick="startGame('hard')">HARD</button>
+  <button onclick="startGame('lunatic')">LUNATIC</button>
+</div>
+
+<div id="top">
+  <div>HP<div class="bar"><div id="hp"></div></div></div>
+  <div>STAGE <span id="stage">1</span></div>
+  <div>
+    ENEMY<div class="bar" id="enemyBar"><div id="enemy"></div></div>
+    <div id="enemyAttrDisplay"></div>
+  </div>
+</div>
+
+<div id="timer">TIME: 30</div>
+<div id="combo"></div>
+<div id="turnText"></div>
+<div id="effectText"></div>
+<div id="board"></div>
+
+<div id="skillBar">
+  <button class="skillBtn" id="skill1" onclick="useSkill(1)">全体攻撃</button>
+  <button class="skillBtn" id="skill2" onclick="useSkill(2)">回復</button>
+</div>
+
+<div style="text-align:center">
+  <button onclick="saveGame()">💾 SAVE</button>
+  <button onclick="deleteSave()">🗑 RESET</button>
+</div>
+
+<div id="result">
+  <div>
+    <h2 id="resultText"></h2>
+    <button onclick="location.reload()">RETRY</button>
+  </div>
+</div>
+
+<script>
+const ROW=5,COL=6;
+const colors=["fire","water","wood","light","dark"];
+const SAVE_KEY="PUZZLE_ULTIMATE_SAVE";
+
+let board=[],drag=false,last=null;
+let stage=1,playerHP=100,enemyHP=100;
+let combo=0,timer=30,timerOn=false,enemyType="normal",enemyAttr="fire";
+let timerInterval=null, difficulty="normal";
+let skillCooldown=[0,0];
+
+const ATTR_WEAK={fire:"wood",water:"fire",wood:"water",light:"dark",dark:"light"};
+const ATTR_ABSORB={fire:"water",water:"wood",wood:"fire",light:"dark",dark:"light"};
+
+function rand(){ return colors[Math.floor(Math.random()*colors.length)]; }
+
+function startGame(diff){
+  difficulty=diff;
+  document.getElementById("difficulty").style.display="none";
+  if(!loadGame()) init();
+  updateSkillUI();
+}
+
+function init(){
+  board=[];
+  for(let r=0;r<ROW;r++){
+    board[r]=[];
+    for(let c=0;c<COL;c++) board[r][c]=rand();
+  }
+  newEnemy(); draw(); updateUI();
+}
+
+function newEnemy(){
+  let baseHP = 100 + stage*20;
+  if(difficulty==="easy") baseHP *= 0.8;
+  if(difficulty==="hard") baseHP *= 1.3;
+  if(difficulty==="lunatic") baseHP *= 2;
+
+  enemyHP = baseHP;
+  enemyType = stage % 5 === 0 ? "boss" : "normal";
+  enemyAttr = colors[Math.floor(Math.random()*colors.length)];
+
+  if(enemyType==="boss"){
+    enemyHP *= 2 + stage*0.2;
+  }
+
+  document.getElementById("enemyAttrDisplay").textContent = "属性: "+enemyAttr.toUpperCase();
+}
+
+function draw(){
+  const b=document.getElementById("board");
+  b.innerHTML="";
+  for(let r=0;r<ROW;r++)for(let c=0;c<COL;c++){
+    const d=document.createElement("div");
+    d.className="orb "+board[r][c];
+    d.dataset.r=r; d.dataset.c=c;
+    b.appendChild(d);
+  }
+}
+
+document.addEventListener("pointerdown",e=>{
+  if(!e.target.classList.contains("orb"))return;
+  drag=true;
+  last={r:+e.target.dataset.r,c:+e.target.dataset.c};
+  if(!timerOn) startTurn();
+});
+document.addEventListener("pointermove",e=>{
+  if(!drag)return;
+  const t=document.elementFromPoint(e.clientX,e.clientY);
+  if(!t||!t.classList.contains("orb"))return;
+  let r=+t.dataset.r,c=+t.dataset.c;
+  if(Math.abs(r-last.r)+Math.abs(c-last.c)==1){
+    [board[r][c],board[last.r][last.c]]=[board[last.r][last.c],board[r][c]];
+    last={r,c};
+    draw();
+  }
+});
+document.addEventListener("pointerup",()=>{drag=false;check();});
+
+function startTurn(){
+  timerOn=true;
+  switch(difficulty){
+    case "easy": timer=40; break;
+    case "normal": timer=30; break;
+    case "hard": timer=20; break;
+    case "lunatic": timer=15; break;
+  }
+  showTurn("YOUR TURN","player");
+  startTimer();
+}
+
+function showTurn(text,type){
+  const t=document.getElementById("turnText");
+  t.textContent=text;
+  t.className=type==="player"?"turn-player":"turn-enemy";
+  t.style.opacity=1;
+  setTimeout(()=>t.style.opacity=0,800);
+}
+
+function showEffect(txt,color,type){
+  const e=document.getElementById("effectText");
+  e.textContent=txt;
+  e.style.color=color;
+  e.style.opacity=1;
+  e.style.transform="scale(1.4)";
+  setTimeout(()=>{e.style.opacity=0;e.style.transform="scale(1)";},600);
+}
+
+function showOrbParticle(color,type){
+  const particleCount = 12;
+  for(let i=0;i<particleCount;i++){
+    const particle=document.createElement("div");
+    particle.style.position="absolute";
+    particle.style.width="10px"; particle.style.height="10px"; particle.style.borderRadius="50%";
+    particle.style.left="50%"; particle.style.top="50%";
+    particle.style.background= type==="weak"?"yellow": type==="absorb"?"cyan": type==="reflect"?"red": type==="immune"?"gray": colorParticleColor(color);
+    document.body.appendChild(particle);
+    let dx=(Math.random()-0.5)*200;
+    let dy=(Math.random()-0.5)*200;
+    if(type==="absorb"){ dx*=-0.5; dy*=-0.5; }
+    particle.animate([{transform:"translate(0px,0px) scale(0)", opacity:1},{transform:`translate(${dx}px,${dy}px) scale(1.2)`, opacity:0}],{duration:600 + Math.random()*200, fill:"forwards"});
+    setTimeout(()=>particle.remove(),800);
+  }
+}
+
+function colorParticleColor(color){
+  switch(color){
+    case "fire": return "rgba(255,50,0,0.9)";
+    case "water": return "rgba(0,180,255,0.8)";
+    case "wood": return "rgba(0,255,80,0.8)";
+    case "light": return "rgba(255,255,120,0.9)";
+    case "dark": return "rgba(180,0,255,0.8)";
+    default: return "white";
+  }
+}
+
+function getDamage(color){
+  let dmg=5,effectTxt="",effectColor="",effectType="";
+  if(difficulty==="easy"){
+    if(color===ATTR_WEAK[enemyAttr]){ dmg=10; effectTxt="WEAK!"; effectColor="yellow"; effectType="weak"; }
+  } else if(difficulty==="normal"){
+    if(color===ATTR_ABSORB[enemyAttr]){ dmg=0; effectTxt="ABSORB!"; effectColor="cyan"; effectType="absorb"; }
+    else if(color===ATTR_WEAK[enemyAttr]){ dmg=10; effectTxt="WEAK!"; effectColor="yellow"; effectType="weak"; }
+  } else {
+    if(color===ATTR_ABSORB[enemyAttr]){ dmg=0; effectTxt="ABSORB!"; effectColor="cyan"; effectType="absorb"; }
+    else if(color===enemyAttr){ dmg=0; effectTxt="REFLECT!"; effectColor="red"; effectType="reflect"; }
+    else if(color===ATTR_WEAK[enemyAttr]){ dmg=10; effectTxt="WEAK!"; effectColor="yellow"; effectType="weak"; }
+    else { dmg=0; effectTxt="IMMUNE"; effectColor="gray"; effectType="immune"; }
+  }
+  if(effectTxt) showEffect(effectTxt,effectColor,effectType);
+  showOrbParticle(color,effectType);
+  return dmg;
+}
+
+function check(){
+  let matched=false;
+  for(let r=0;r<ROW;r++){
+    for(let c=0;c<COL;c++){
+      let color=board[r][c];
+      if(c<=COL-3 && board[r][c+1]===color && board[r][c+2]===color){
+        for(let k=0;k<3;k++) board[r][c+k]=null; matched=true;
+      }
+      if(r<=ROW-3 && board[r+1][c]===color && board[r+2][c]===color){
+        for(let k=0;k<3;k++) board[r+k][c]=null; matched=true;
+      }
+    }
+  }
+  if(matched){
+    combo++;
+    document.getElementById("combo").textContent=combo+" COMBO";
+    document.getElementById("combo").style.opacity=1;
+    setTimeout(()=>document.getElementById("combo").style.opacity=0,800);
+    applyDamage();
+    dropOrbs();
+    refillBoard();
+    draw();
+    setTimeout(check,300);
+  } else {
+    endTurn();
+  }
+}
+
+function dropOrbs(){
+  for(let c=0;c<COL;c++){
+    let empties=[];
+    for(let r=ROW-1;r>=0;r--){
+      if(!board[r][c]) empties.push(r);
+      else if(empties.length){
+        let rEmpty=empties.shift();
+        board[rEmpty][c]=board[r][c];
+        board[r][c]=null;
+        empties.push(r);
+      }
+    }
+  }
+}
+
+function refillBoard(){
+  for(let r=0;r<ROW;r++){
+    for(let c=0;c<COL;c++){
+      if(!board[r][c]) board[r][c]=rand();
+    }
+  }
+}
+
+function applyDamage(){
+  let totalDmg=0;
+  for(let r=0;r<ROW;r++){
+    for(let c=0;c<COL;c++){
+      if(!board[r][c]) continue;
+      totalDmg += getDamage(board[r][c]);
+    }
+  }
+  enemyHP -= totalDmg;
+  if(enemyHP<=0){ stage++; newEnemy(); }
+  updateUI();
+}
+
+function updateUI(){
+  document.getElementById("hp").style.width=playerHP+"%";
+  const enemyMaxHP = (difficulty==="lunatic"?400:150) + stage*20;
+  document.getElementById("enemy").style.width=Math.min(100,(enemyHP/enemyMaxHP*100))+"%";
+  document.getElementById("stage").textContent=stage;
+  if(playerHP<=0){ document.getElementById("resultText").textContent="GAME OVER"; document.getElementById("result").style.display="flex"; }
+}
+
+function useSkill(n){
+  if(skillCooldown[n-1]>0) return;
+  if(n===1){
+    let dmg=20+stage*2; enemyHP-=dmg; showEffect("SKILL! -"+dmg,"orange");
+  } else if(n===2){
+    let heal=20; playerHP=Math.min(100,playerHP+heal); showEffect("HEAL +"+heal,"lightgreen");
+  }
+  skillCooldown[n-1]=3;
+  updateSkillUI();
+  updateUI();
+}
+
+function updateSkillUI(){
+  skillCooldown.forEach((cd,i)=>{
+    const btn=document.getElementById("skill"+(i+1));
+    btn.textContent=btn.textContent.split(" ")[0]+(cd>0?" ("+cd+")":"");
+    btn.disabled=cd>0;
+  });
+}
+
+function endTurn(){
+  timerOn=false;
+  combo=0;
+  skillCooldown=skillCooldown.map(cd=>cd>0?cd-1:0);
+  updateSkillUI();
+  showTurn("ENEMY TURN","enemy");
+  setTimeout(enemyAction,800);
+}
+
+function enemyAction(){
+  let baseDmg = 5 + stage*2;
+  if(difficulty==="easy") baseDmg *= 0.8;
+  if(difficulty==="hard") baseDmg *= 1.3;
+  if(difficulty==="lunatic") baseDmg *= 1.8;
+  let dmg = Math.floor(Math.random()*baseDmg) + Math.floor(baseDmg/2);
+  playerHP -= dmg;
+  showEffect("ENEMY -"+dmg,"red");
+  if(playerHP<=0) updateUI();
+  else startTurn();
+}
+
+function startTimer(){
+  document.getElementById("timer").textContent="TIME: "+timer;
+  clearInterval(timerInterval);
+  timerInterval=setInterval(()=>{
+    timer--;
+    document.getElementById("timer").textContent="TIME: "+timer;
+    if(timer<=0){ clearInterval(timerInterval); endTurn(); }
+  },1000);
+}
+
+function saveGame(){
+  const data={stage,playerHP,enemyHP,board,skillCooldown};
+  localStorage.setItem(SAVE_KEY,JSON.stringify(data));
+}
+
+function loadGame(){
+  const data=JSON.parse(localStorage.getItem(SAVE_KEY));
+  if(data){
+    stage=data.stage; playerHP=data.playerHP; enemyHP=data.enemyHP;
+    board=data.board; skillCooldown=data.skillCooldown;
+    draw(); updateUI(); updateSkillUI();
+    return true;
+  }
+  return false;
+}
+
+function deleteSave(){
+  localStorage.removeItem(SAVE_KEY);
+  location.reload();
+}
+</script>
+</body>
+</html>
