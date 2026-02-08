@@ -34,16 +34,25 @@ const GAMES = [
     version: "1.0",
     dlc: ["Extra Pack"],
     achievements: ["初プレイ","全クリア"]
-  }
-
+  },
+{
+    id: "game4",
+    title: "wordls",
+    desc: "英単語パズル",
+    img: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS5Xs3Am9a3KmIBOEeVAM6zCD2w8d3qZ36XDw&s",
+    path: "games/game/game.html",
+    version: "1.0",
+    dlc: ["Extra Pack"],
+    achievements: ["初プレイ","全クリア"]
+  },
 
 
     
 ];
 /*
 使うときはid,img,pathを変えること。
-{
-    {
+
+   {
     id: "game",
     title: "",
     desc: "",
@@ -53,6 +62,7 @@ const GAMES = [
     dlc: ["Extra Pack"],
     achievements: ["初プレイ","全クリア"]
   },
+  
 */
 /* =================
    データ操作
