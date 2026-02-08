@@ -18,7 +18,7 @@ const GAMES = [
     id: "game2",
     title: "パズルバブルズ",
     desc: "パズルゲーム",
-    img: "https://png.pngtree.com/png-clipart/20240927/original/pngtree-colorful-glass-ball-png-image_16108516.png",
+    img: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRs6TyR7wNrvYZWqi1ZClmxp46xMTCcuSU7gw&s",
     path: "games/game2/game2.html",
     version: "1.0",
     dlc: ["Extra Pack"],
