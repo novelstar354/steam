@@ -6,7 +6,7 @@
 const GAMES = [
   {
     id: "game1",
-    title: "Danmaku Shooter",
+    title: "風神録",
     desc: "弾幕シューティング",
     img: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTAycOq5BxpzLitBIHMmgDiFTQRf0nCPJ1ilg&s",
     path: "games/game1/game1.html",
@@ -16,16 +16,29 @@ const GAMES = [
   },
   {
     id: "game2",
-    title: "Puzzle Pips",
+    title: "パズルバブルズ",
     desc: "パズルゲーム",
-    img: "https://picsum.photos/400/201",
-    path: "games/game2/index.html",
+    img: "https://png.pngtree.com/png-clipart/20240927/original/pngtree-colorful-glass-ball-png-image_16108516.png",
+    path: "games/game2/game2.html",
     version: "1.0",
     dlc: ["Extra Pack"],
     achievements: ["初プレイ","全クリア"]
   }
 ];
-
+/*
+使うときはid,img,pathを変えること。
+{
+    id: "game",
+    title: "Puzzle Pips",
+    desc: "パズルゲーム",
+    img: "",
+    path: "games/game/game.html",
+    version: "1.0",
+    dlc: ["Extra Pack"],
+    achievements: ["初プレイ","全クリア"]
+  }
+];
+*
 /* =================
    データ操作
 ================= */
