@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Steam Lite Store</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="appboot">
+  <div class="ring"></div>
+  STEAM
+</div>
+
+<header>STEAM LITE - STORE</header>
+<a href="library.html">ライブラリ</a>
+
+<div class="deck-grid" id="store"></div>
+
+<script src="steam.js"></script>
+<script>
+const s=document.getElementById("store");
+
+GAMES.forEach(g=>{
+ const c=document.createElement("div");
+ c.className="deck-card";
+ c.innerHTML=`
+  <img src="${g.img}">
+  <h3>${g.title}</h3>
+  <p>${g.desc}</p>
+
+  <button id="btn_${g.id}" class="bigbtn">ダウンロード</button>
+
+  <div class="progress">
+    <div class="bar" id="bar_${g.id}"></div>
+  </div>
+ `;
+ s.appendChild(c);
+
+ // ← ここ超重要（後から確実にイベント登録）
+ const btn=document.getElementById("btn_"+g.id);
+ btn.addEventListener("click",()=>fakeDownload(g.id));
+});
+
+
+</script>
+
+</body>
+</html>
