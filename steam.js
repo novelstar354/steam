@@ -23,22 +23,33 @@ const GAMES = [
     version: "1.0",
     dlc: ["Extra Pack"],
     achievements: ["初プレイ","全クリア"]
-  }
-];
-/*
-使うときはid,img,pathを変えること。
-{
-    id: "game",
-    title: "Puzzle Pips",
-    desc: "パズルゲーム",
-    img: "",
-    path: "games/game/game.html",
+  },
+
+ {
+    id: "game3",
+    title: "SLOT MACHINE",
+    desc: "ギャンブル体験",
+    img: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTXpgl9VrjKZLmPonXHSLJ8uLyNOPi7chR_Mtt0SCVJTx5-OI3J9WMJv_aO&s=10",
+    path: "games/game3/game3.html",
     version: "1.0",
     dlc: ["Extra Pack"],
     achievements: ["初プレイ","全クリア"]
   }
 ];
-*
+/*
+使うときはid,img,pathを変えること。
+{
+    {
+    id: "game",
+    title: "",
+    desc: "",
+    img: "",
+    path: "games/game/game.html",
+    version: "1.0",
+    dlc: ["Extra Pack"],
+    achievements: ["初プレイ","全クリア"]
+  },
+*/
 /* =================
    データ操作
 ================= */
