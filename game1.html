@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<title>風神録</title>
+<link rel="icon" href="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTAycOq5BxpzLitBIHMmgDiFTQRf0nCPJ1ilg&s" sizes="16×16" type="image/png" /> 
+<style>
+body{margin:0;background:#000;overflow:hidden;font-family:sans-serif}
+canvas{display:block;margin:0 auto;background:#000}
+
+/* メニュー */
+#menu{
+ position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+ background:#000;color:#fff;flex-direction:column;gap:16px;z-index:10;
+ transition:all 0.3s;
+}
+#menu h1{margin:0 0 20px 0;font-size:32px;}
+.div-option{
+ padding:10px 20px;font-size:24px;color:white;transition:all 0.2s;cursor:pointer;
+}
+.div-option.selected{color:red;font-size:36px;transform: scale(1.2);}
+
+/* Overlay */
+#overlay{
+ position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+ font-family:sans-serif;z-index:20;display:none;
+ overflow:hidden;
+}
+#overlayCanvas{
+ position:absolute;inset:0; z-index:1;
+}
+#overlay h1,#overlay p,#overlay button{
+ position:relative; z-index:2;
+ text-align:center;
+}
+#overlay h1{font-size:72px;margin:0;text-shadow:2px 2px 10px #000;}
+#overlay p{font-size:28px;margin:20px;text-shadow:1px 1px 5px #000;}
+#overlay button{
+ font-size:28px;padding:12px 30px;cursor:pointer;
+ border:none;background:linear-gradient(45deg,#ff0,#f0f);color:#000;
+ text-shadow:1px 1px 2px #fff;
+ transition:0.3s;
+}
+#overlay button:hover{
+ background:linear-gradient(45deg,#f0f,#0ff);
+ transform:scale(1.1);
+}
+</style>
+</head>
+<body>
+
+<div id="menu">
+ <h1>Difficulty Select</h1>
+ <div class="div-option" data-d="Easy">Easy</div>
+ <div class="div-option" data-d="Normal">Normal</div>
+ <div class="div-option" data-d="Hard">Hard</div>
+ <div class="div-option" data-d="Lunatic">Lunatic</div>
+</div>
+
+<div id="overlay">
+ <canvas id="overlayCanvas"></canvas>
+ <h1 id="overlay-title"></h1>
+ <p id="overlay-score"></p>
+ <button id="overlay-btn">Restart</button>
+</div>
+
+<canvas id="game"></canvas>
+<script src="../../steam.js"></script>
+<script>
+// 実績例
+unlock("game1","初プレイ");
+
+// ボス倒したら
+// unlock("game1","ボス撃破");
+</script>
+
+<script>
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+canvas.width=480; canvas.height=720;
+
+// ===== 難易度 =====
+const diffData={
+ Easy:{mul:0.7,rate:120,hpMul:1},
+ Normal:{mul:1,rate:90,hpMul:1},
+ Hard:{mul:1.4,rate:60,hpMul:1},
+ Lunatic:{mul:3,rate:20,hpMul:2}
+};
+let DIFF=diffData.Normal;
+
+// ===== メニュー =====
+const menu=document.getElementById("menu");
+const options = Array.from(menu.querySelectorAll(".div-option"));
+let selectedIndex = 0;
+function updateMenuVisual(){options.forEach((o,i)=>{o.classList.toggle("selected", i===selectedIndex);});}
+updateMenuVisual();
+document.addEventListener("keydown",e=>{
+ if(menu.style.display!=='none'){
+   if(e.key==='ArrowUp'){selectedIndex=(selectedIndex+options.length-1)%options.length; updateMenuVisual();}
+   if(e.key==='ArrowDown'){selectedIndex=(selectedIndex+1)%options.length; updateMenuVisual();}
+   if(e.key==='Enter'){selectDifficulty();}
+ }
+});
+options.forEach(o=>o.onclick=selectDifficulty);
+function selectDifficulty(){
+ DIFF = diffData[options[selectedIndex].dataset.d];
+ menu.style.display='none';
+ startGame();
+}
+
+// ===== プレイヤー =====
+const player={x:240,y:620,r:3,lives:3,bomb:3,inv:0,bombing:0};
+let autoFire=false;
+const keys={};
+document.onkeydown=e=>{
+ keys[e.key]=true;
+ if(e.key==='p') paused=!paused;
+ if(e.key==='x') autoFire=!autoFire;
+ if(e.key==='b' && player.bomb>0 && player.bombing===0){player.bomb--; player.bombing=120; enemyBullets=[]; lasers=[]; effect(player.x,player.y,120);}
+};
+document.onkeyup=e=>keys[e.key]=false;
+let paused=false;
+
+// ===== 弾管理 =====
+let shots=[],enemyBullets=[],lasers=[],effects=[];
+
+// ===== ボス =====
+let stage=1;
+const boss={x:240,y:120,vx:2,vy:0,hp:1500,maxHp:1500,active:false,moveTimer:0};
+
+// ===== エフェクト =====
+function effect(x,y,n){for(let i=0;i<n;i++)effects.push({x,y,vx:(Math.random()-0.5)*4,vy:(Math.random()-0.5)*4,t:30});}
+
+// ===== 弾幕 =====
+function circle(x,y,n,s){for(let i=0;i<n;i++){let a=i*Math.PI*2/n;enemyBullets.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s});}}
+function spiral(x,y,t){let count=DIFF===diffData.Lunatic?24:16;for(let i=0;i<count;i++){let a=t*0.15+i*0.25;let spd=DIFF===diffData.Lunatic?3:2.5;enemyBullets.push({x,y,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd});}}
+function rain(){let cnt=DIFF===diffData.Lunatic?30*DIFF.mul:20*DIFF.mul;for(let i=0;i<cnt;i++)enemyBullets.push({x:Math.random()*480,y:0,vx:0,vy:(2+Math.random()*3)*DIFF.mul});}
+function laser(x){lasers.push({x,w:10,t:DIFF===diffData.Lunatic?120:90});}
+
+// ===== 星型スペル弾幕（stage=2） =====
+function starSpell(x,y,t){
+ let points = DIFF===diffData.Lunatic?8:5;
+ let r = 2 + (DIFF===diffData.Lunatic?1:0);
+ for(let i=0;i<points;i++){
+   let angle = i*2*Math.PI/points + t*0.1;
+   enemyBullets.push({x:x+Math.cos(angle)*20, y:y+Math.sin(angle)*20, vx:Math.cos(angle)*r, vy:Math.sin(angle)*r});
+ }
+}
+
+// ===== ボス移動 =====
+function moveBoss(){boss.moveTimer++;boss.x+=boss.vx;if(boss.x<60||boss.x>420)boss.vx*=-1;if(boss.moveTimer%120===0)boss.vy=(Math.random()>0.5?1:-1)*2;boss.y+=boss.vy;if(boss.y<80||boss.y>200)boss.vy*=-1;}
+
+// ===== 6WAYショット =====
+function shoot6(){const slow=keys['Shift'];const speed=7;if(slow){const offsets=[-24,-14,-6,6,14,24];offsets.forEach(off=>shots.push({x:player.x+off,y:player.y,vx:0,vy:-speed}));}else{const angles=[-0.55,-0.32,-0.16,0.16,0.32,0.55];angles.forEach(a=>shots.push({x:player.x,y:player.y,vx:Math.sin(a)*speed,vy:-Math.cos(a)*speed}));}}
+
+// ===== Overlay =====
+const overlay=document.getElementById("overlay");
+const overlayCanvas=document.getElementById("overlayCanvas");
+const octx=overlayCanvas.getContext("2d");
+overlayCanvas.width=480; overlayCanvas.height=720;
+const overlayTitle=document.getElementById("overlay-title");
+const overlayScore=document.getElementById("overlay-score");
+const overlayBtn=document.getElementById("overlay-btn");
+overlayBtn.onclick = ()=>{location.reload();};
+
+let overlayParticles=[],overlayScale=1,overlayScaleDir=0.02;
+function initOverlayParticles(color){
+ overlayParticles=[];
+ for(let i=0;i<150;i++){overlayParticles.push({x:Math.random()*480,y:Math.random()*720,vx:(Math.random()-0.5)*2,vy:(Math.random()-0.5)*2,r:Math.random()*3+1,color:color});}
+}
+function drawOverlayParticles(){octx.clearRect(0,0,480,720);overlayParticles.forEach(p=>{p.x+=p.vx;p.y+=p.vy;if(p.x<0||p.x>480)p.vx*=-1;if(p.y<0||p.y>720)p.vy*=-1;octx.fillStyle=p.color;octx.beginPath();octx.arc(p.x,p.y,p.r,0,Math.PI*2);octx.fill();});requestAnimationFrame(drawOverlayParticles);}
+function showOverlay(type){
+ overlay.style.display='flex';
+ overlayTitle.textContent = type==="gameover"?"GAME OVER":"★ GAME CLEAR ★";
+ overlayTitle.style.color = type==="gameover"?"#ff4444":"#44f";
+ overlayScore.textContent = `Score: ${score}`;
+ overlayScale=1;
+ initOverlayParticles(type==="gameover"?"#ff4444":"#44f");
+ drawOverlayParticles();
+ if(type==="gameclear") effects.push({x:240,y:360,vx:0,vy:0,t:200,star:true});
+}
+
+// ===== メイン =====
+let timer=0,score=0;
+function startGame(){requestAnimationFrame(loop);}
+function update(){
+ if(paused) return;
+ timer++; if(player.inv>0)player.inv--; if(player.bombing>0)player.bombing--;
+
+ let sp=keys['Shift']?2:4;
+ if(keys['ArrowLeft'])player.x-=sp;if(keys['ArrowRight'])player.x+=sp;if(keys['ArrowUp'])player.y-=sp;if(keys['ArrowDown'])player.y+=sp;
+ if(autoFire && timer%5===0) shoot6();
+
+ shots.forEach(s=>{s.x+=s.vx;s.y+=s.vy;}); shots=shots.filter(s=>s.y>0&&s.x>0&&s.x<480);
+ if(timer>120&&!boss.active) boss.active=true;
+
+ if(boss.active){
+  moveBoss();
+  // stage2は星型弾幕
+  if(stage===2 && timer%30===0) starSpell(boss.x,boss.y,timer);
+  if(timer%DIFF.rate===0) circle(boss.x,boss.y,DIFF===diffData.Lunatic?60*DIFF.mul:48*DIFF.mul,2.2*DIFF.mul);
+  if(timer%(DIFF===diffData.Lunatic?15:20)===0) spiral(boss.x,boss.y,timer);
+  if(timer%(DIFF===diffData.Lunatic?60:80)===0) rain();
+  if(timer%(DIFF===diffData.Lunatic?100:140)===0) laser(Math.random()*480);
+  if(DIFF===diffData.Lunatic && timer%50===0) circle(boss.x,boss.y,16,5);
+ }
+
+ enemyBullets.forEach(b=>{b.x+=b.vx;b.y+=b.vy;}); enemyBullets=enemyBullets.filter(b=>b.y<720&&b.x>-20&&b.x<500);
+ lasers.forEach(l=>l.t--); lasers=lasers.filter(l=>l.t>0);
+
+ enemyBullets.forEach(b=>{let dx=b.x-player.x,dy=b.y-player.y;if(dx*dx+dy*dy<player.r*player.r && player.inv<=0){player.lives=Math.max(0,player.lives-1);player.inv=120;enemyBullets=[];effect(player.x,player.y,80);}});
+ lasers.forEach(l=>{if(player.x>l.x-6 && player.x<l.x+6 && player.inv<=0){player.lives=Math.max(0,player.lives-1);player.inv=120;effect(player.x,player.y,60);}});
+
+ if(player.lives===0){showOverlay("gameover");return;}
+
+ shots=shots.filter(s=>{let dx=s.x-boss.x,dy=s.y-boss.y;if(dx*dx+dy*dy<900 && boss.active){boss.hp-=5;score+=10;effect(s.x,s.y,5);return false;}return true;});
+
+ if(boss.hp<=0){
+  if(stage===4){enemyBullets=[];lasers=[];effects.push({x:240,y:360,vx:0,vy:0,t:200,star:true}); showOverlay("gameclear"); return;}
+  stage++;
+  score+=1000;
+  let hpBase = DIFF===diffData.Lunatic ? 3000 : 1500;
+  boss.maxHp = hpBase + (stage-1)*(DIFF===diffData.Lunatic?2000:1000);
+  boss.hp = boss.maxHp;
+  boss.active=false;
+  timer=0;
+ }
+
+ // 星型爆発エフェクト
+ effects.forEach(e=>{
+   e.x+=e.vx; e.y+=e.vy; e.t--;
+   if(e.star && e.t%5===0){
+     for(let i=0;i<8;i++){let a=i*Math.PI/4;enemyBullets.push({x:e.x,y:e.y,vx:Math.cos(a)*3,vy:Math.sin(a)*3});}
+   }
+ });
+ effects=effects.filter(e=>e.t>0);
+}
+
+function draw(){
+ ctx.fillStyle="rgba(0,0,0,0.25)"; ctx.fillRect(0,0,480,720);
+ if(player.inv%10<5) ctx.fillStyle="cyan"; else ctx.fillStyle="white";
+ ctx.beginPath();ctx.arc(player.x,player.y,6,0,Math.PI*2);ctx.fill();
+ ctx.fillStyle="red";ctx.beginPath();ctx.arc(player.x,player.y,player.r,0,Math.PI*2);ctx.fill();
+ if(player.bombing>0){ctx.strokeStyle="rgba(0,200,255,0.6)";ctx.beginPath();ctx.arc(player.x,player.y,80,0,Math.PI*2);ctx.stroke();}
+ if(boss.active){ctx.fillStyle="purple";ctx.beginPath();ctx.arc(boss.x,boss.y,30,0,Math.PI*2);ctx.fill();}
+ if(boss.active){ctx.fillStyle="red";ctx.fillRect(20,10,440,12); ctx.fillStyle="lime"; ctx.fillRect(20,10,440*(boss.hp/boss.maxHp),12);}
+ ctx.fillStyle="white"; shots.forEach(s=>ctx.fillRect(s.x-2,s.y-6,4,8));
+ ctx.fillStyle="magenta"; enemyBullets.forEach(b=>{ctx.beginPath();ctx.arc(b.x,b.y,4,0,Math.PI*2);ctx.fill();});
+ ctx.fillStyle="orange"; effects.forEach(e=>ctx.fillRect(e.x,e.y,2,2));
+ ctx.fillStyle="#fff"; ctx.fillText(`Lives:${player.lives}`,10,40); ctx.fillText(`Bomb:${player.bomb}`,10,60);
+ ctx.fillText(`Score:${score}`,10,80); ctx.fillText(`Stage ★${stage}`,10,100);
+ for(let i=0;i<stage;i++){ctx.fillStyle="yellow";ctx.fillText("★",10+10*i,120);}
+ if(paused) ctx.fillText("PAUSED",200,360);
+}
+
+function overlayLoop(){
+ overlayScale += overlayScaleDir;
+ if(overlayScale>1.2 || overlayScale<0.8) overlayScaleDir*=-1;
+ overlayTitle.style.transform = `scale(${overlayScale})`;
+ requestAnimationFrame(overlayLoop);
+}
+
+function loop(){update();draw();requestAnimationFrame(loop);}
+</script>
+</body>
+</html>
