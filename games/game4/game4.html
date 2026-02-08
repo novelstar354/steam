@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>WORDLS</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<link rel="icon" href="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS5Xs3Am9a3KmIBOEeVAM6zCD2w8d3qZ36XDw&s" sizes="16×16" type="image/png" /> 
+<style>
+body{
+  margin:0;background:#121213;color:#fff;
+  font-family:system-ui;display:flex;justify-content:center;
+}
+#app{max-width:500px;width:100%;padding:10px;text-align:center;}
+header{display:flex;justify-content:space-between;align-items:center;}
+
+.grid{
+  display:grid;
+  grid-template-columns:repeat(5,1fr);
+  gap:6px;margin:20px auto;
+}
+.cell{
+  aspect-ratio:1;
+  border:2px solid #3a3a3c;
+  display:flex;align-items:center;justify-content:center;
+  font-size:2rem;font-weight:700;
+}
+.filled{border-color:#565758;}
+.correct{background:#538d4e;border-color:#538d4e;}
+.present{background:#b59f3b;border-color:#b59f3b;}
+.absent{background:#3a3a3c;border-color:#3a3a3c;}
+
+.keyboard{
+  display:grid;
+  grid-template-columns:repeat(10,1fr);
+  gap:6px;
+}
+.key{
+  background:#818384;border:none;border-radius:4px;
+  padding:12px 0;font-weight:bold;color:#000;
+}
+.key.correct{background:#538d4e;color:#fff;}
+.key.present{background:#b59f3b;color:#fff;}
+.key.absent{background:#3a3a3c;color:#fff;}
+.key.wide{grid-column:span 2;}
+
+#overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.7);
+  display:none;align-items:center;justify-content:center;
+}
+#modal{background:#222;padding:20px;border-radius:8px;width:260px;}
+</style>
+</head>
+<body>
+
+<div id="app">
+<header>
+<h1>WORDLE</h1>
+<button id="resetGame" style="padding:10px 20px; margin:5px;">New Game</button>
+<div id="number"></div>
+</header>
+
+<div id="msg"></div>
+<div class="grid" id="grid"></div>
+<pre id="results"></pre>
+<div class="keyboard" id="kb"></div>
+</div>
+
+<div id="overlay">
+  <div id="modal">
+    <p>パスワード</p>
+    <input id="pass" type="password">
+  </div>
+</div>
+<script src="words.js"></script>
+
+<script>
+const ROWS=6,COLS=5;
+
+const gridEl=document.getElementById("grid");
+const kb=document.getElementById("kb");
+const msgEl=document.getElementById("msg");
+const number=document.getElementById("number");
+const results=document.getElementById("results");
+const overlay=document.getElementById("overlay");
+const pass=document.getElementById("pass");
+const resetBtn=document.getElementById("resetGame");
+
+let save=JSON.parse(localStorage.getItem("wordle-save")||"{}");
+
+let index=save.index||0;
+let grid=save.grid||Array.from({length:ROWS},()=>Array(COLS).fill(""));
+let states=save.states||Array.from({length:ROWS},()=>Array(COLS).fill(""));
+let row=save.row||0;
+let col=save.col||0;
+let done=save.done||false;
+let emojiResults=save.emojiResults||[];
+
+const ANSWER=WORDS[index%WORDS.length];
+number.textContent=`#${index+1}`;
+
+function saveData(){
+  localStorage.setItem("wordle-save",JSON.stringify({
+    index,grid,states,row,col,done,emojiResults
+  }));
+}
+
+function draw(){
+  gridEl.innerHTML="";
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      const d=document.createElement("div");
+      d.className="cell";
+      if(grid[r][c]) d.classList.add("filled");
+      if(states[r][c]) d.classList.add(states[r][c]);
+      d.textContent=grid[r][c];
+      gridEl.appendChild(d);
+    }
+  }
+}
+draw();
+
+const KEYS=[..."QWERTYUIOP",..."ASDFGHJKL","ENTER",..."ZXCVBNM","←"];
+const keyEls={};
+
+KEYS.forEach(k=>{
+  const b=document.createElement("button");
+  b.textContent=k;
+  b.className="key"+((k==="ENTER"||k==="←")?" wide":"");
+  b.onclick=()=>press(k);
+  kb.appendChild(b);
+  keyEls[k]=b;
+});
+
+function paintKey(letter,state){
+  const k=keyEls[letter];
+  if(!k) return;
+  if(k.classList.contains("correct")) return;
+  if(k.classList.contains("present") && state==="absent") return;
+  k.className="key "+state;
+}
+
+function press(k){
+  if(done) return;
+
+  if(k==="←"&&col>0){
+    grid[row][--col]="";
+  }else if(k==="ENTER"&&col===COLS){
+    submit();
+  }else if(col<COLS&&/^[A-Z]$/.test(k)){
+    grid[row][col++]=k;
+  }
+  saveData();draw();
+}
+
+function submit(){
+  const w=grid[row].join("").toLowerCase();
+  if(!WORDS.includes(w)) return msg("Not in Word List");
+
+  const a=[...ANSWER];
+  const state=Array(5).fill("absent");
+
+  for(let i=0;i<5;i++){
+    if(w[i]===a[i]){
+      state[i]="correct";a[i]=null;
+    }
+  }
+  for(let i=0;i<5;i++){
+    if(state[i]!=="correct"){
+      const n=a.indexOf(w[i]);
+      if(n>-1){
+        state[i]="present";a[n]=null;
+      }
+    }
+  }
+
+  state.forEach((s,i)=>{
+    states[row][i]=s;
+    paintKey(grid[row][i],s);
+  });
+
+  emojiResults.push(state.map(s=>s==="correct"?"🟩":s==="present"?"🟨":"◼️").join(""));
+  results.textContent=emojiResults.join("\n");
+
+  if(w===ANSWER){done=true;msg("Well Done!");}
+  else if(++row===ROWS){done=true;msg("💀 "+ANSWER.toUpperCase());}
+  col=0;saveData();draw();
+}
+
+function msg(t){msgEl.textContent=t;}
+
+resetBtn.onclick=()=>{
+  index++;
+  localStorage.clear();
+  localStorage.setItem("wordle-save",JSON.stringify({index}));
+  location.reload();
+};
+
+
+    
+document.addEventListener("keydown",e=>{
+  if(e.ctrlKey&&e.altKey&&e.key==="l"){
+    overlay.style.display="flex";pass.focus();return;
+  }
+  if(e.key==="Enter")press("ENTER");
+  if(e.key==="Backspace")press("←");
+  if(/^[a-z]$/i.test(e.key))press(e.key.toUpperCase());
+});
+
+pass.onkeydown=e=>{
+  if(e.key==="Enter"){
+    if(pass.value==="appleQer!") msg("答え："+ANSWER.toUpperCase());
+    overlay.style.display="none";
+    pass.value="";
+  }
+};
+</script>
+</body>
+</html>
