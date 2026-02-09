@@ -35,7 +35,7 @@ const GAMES = [
     dlc: ["Extra Pack"],
     achievements: ["初プレイ","全クリア"]
   },
-{
+/*{
     id: "game4",
     title: "wordls",
     desc: "英単語パズル",
@@ -44,7 +44,7 @@ const GAMES = [
     version: "1.0",
     dlc: ["Extra Pack"],
     achievements: ["初プレイ","全クリア"]
-  },
+  }, */
 {
     id: "game5",
     title: "フルーツゲーム",
