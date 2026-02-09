@@ -40,14 +40,23 @@ const GAMES = [
     title: "wordls",
     desc: "英単語パズル",
     img: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS5Xs3Am9a3KmIBOEeVAM6zCD2w8d3qZ36XDw&s",
-    path: "games/game/game.html",
+    path: "games/game4/game4.html",
+    version: "1.0",
+    dlc: ["Extra Pack"],
+    achievements: ["初プレイ","全クリア"]
+  },
+{
+    id: "game5",
+    title: "フルーツゲーム",
+    desc: "フルーツのパズルゲーム",
+    img: "https://tsukatte.com/wp-content/uploads/2019/01/watermelon-cut-big.png",
+    path: "games/game5/game5.html",
     version: "1.0",
     dlc: ["Extra Pack"],
     achievements: ["初プレイ","全クリア"]
   },
 
 
-    
 ];
 /*
 使うときはid,img,pathを変えること。
