@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>フルーツゲーム</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<link rel="icon" href="https://tsukatte.com/wp-content/uploads/2019/01/watermelon-cut-big.png" sizes="16×16" type="image/png" /> 
+<script src="https://cdn.jsdelivr.net/npm/matter-js@0.19.0/build/matter.min.js"></script>
+
+<style>
+body{
+ margin:0;
+ display:flex;
+ justify-content:center;
+ align-items:center;
+ min-height:100svh;
+ background:#0f172a;
+ font-family:system-ui;
+}
+#wrap{
+ background:#fff7ed;
+ padding:10px;
+ border-radius:14px;
+ position:relative;
+ transform-origin:top center;
+}
+#ui{
+ display:flex;
+ justify-content:space-between;
+ align-items:center;
+ margin-bottom:6px;
+ font-weight:bold;
+ font-size:14px;
+}
+#right{
+ display:flex;
+ gap:6px;
+ align-items:center;
+}
+.badge{
+ background:#fde68a;
+ padding:2px 8px;
+ border-radius:999px;
+}
+#resetBtn{
+ border:none;
+ background:#fecaca;
+ border-radius:999px;
+ padding:4px 8px;
+ cursor:pointer;
+ font-size:14px;
+}
+canvas{
+ width:360px;
+ height:520px;
+ border-radius:10px;
+ background:#fef3c7;
+}
+#guide{
+ position:absolute;
+ top:58px;
+ width:2px;
+ height:460px;
+ background:rgba(239,68,68,.6);
+ pointer-events:none;
+}
+.over{
+ position:absolute;
+ inset:0;
+ display:flex;
+ flex-direction:column;
+ align-items:center;
+ justify-content:center;
+ gap:12px;
+ font-size:28px;
+ font-weight:bold;
+ background:rgba(0,0,0,.5);
+ color:white;
+}
+.hint{
+ text-align:center;
+ font-size:11px;
+ color:#64748b;
+ margin-top:4px;
+}
+</style>
+</head>
+<body>
+
+<div id="wrap">
+ <div id="ui">
+  <div>
+   Score: <span id="score">0</span><br>
+   High: <span id="high">0</span>
+  </div>
+  <div id="right">
+   <div class="badge">🎮 <span id="current">🍒</span></div>
+   <div class="badge">➡ <span id="next">🍓</span></div>
+   <button id="resetBtn">🔄</button>
+  </div>
+ </div>
+
+ <div id="guide"></div>
+ <canvas id="world" width="360" height="520"></canvas>
+ <div class="hint">← → / A D / Space / Enter / R</div>
+
+ <div id="over" class="over" style="display:none">GAME OVER</div>
+</div>
+
+<script>
+const {Engine,Render,Runner,Bodies,World,Events,Sleeping}=Matter;
+const SAVE_KEY="suika_full";
+
+const canvas=document.getElementById("world");
+const wrap=document.getElementById("wrap");
+const guide=document.getElementById("guide");
+const scoreEl=document.getElementById("score");
+const highEl=document.getElementById("high");
+const currentEl=document.getElementById("current");
+const nextEl=document.getElementById("next");
+const overEl=document.getElementById("over");
+
+const engine=Engine.create();
+engine.gravity.y=1.05;
+
+Render.run(Render.create({
+ canvas,engine,
+ options:{width:360,height:520,wireframes:false,background:"#fef3c7"}
+}));
+Runner.run(Runner.create(),engine);
+
+/*const fruits=[
+ {e:"🍒",r:12,s:10,d:0.001},
+ {e:"🍓",r:16,s:20,d:0.0012},
+ {e:"🍇",r:20,s:40,d:0.0015},
+ {e:"🍊",r:24,s:80,d:0.0018},
+ {e:"🍎",r:28,s:160,d:0.0022},
+ {e:"🍐",r:32,s:320,d:0.0026},
+ {e:"🍑",r:36,s:640,d:0.003},
+ {e:"🍍",r:42,s:960,d:0.0032},
+ {e:"🍈",r:45,s:1280,d:0.0035},  
+ {e:"🍉",r:48,s:1640,d:0.004},
+];
+*/
+/* 🍎 本家サイズ比 */
+/*const fruits=[
+ {e:"🍒",r:14,s:10,d:0.001},
+ {e:"🍓",r:18,s:20,d:0.0012},
+ {e:"🍇",r:23,s:40,d:0.0015},
+ {e:"🍊",r:28,s:80,d:0.0018},
+ {e:"🍎",r:33,s:160,d:0.0022},
+ {e:"🍐",r:38,s:320,d:0.0026},
+ {e:"🍑",r:44,s:640,d:0.003},
+ {e:"🍍",r:50,s:960,d:0.0032},
+ {e:"🍈",r:56,s:1280,d:0.0035},
+ {e:"🍉",r:62,s:2048,d:0.004},
+]; */
+/* 🍎 本家サイズ比 */
+const fruits=[
+ {e:"🍒",r:14,s:10,d:0.001},
+ {e:"🍓",r:18,s:20,d:0.0012},
+ {e:"🍇",r:23,s:40,d:0.0015},
+ {e:"🍊",r:28,s:80,d:0.0018},
+ {e:"🍎",r:33,s:160,d:0.0022},
+ {e:"🍐",r:38,s:320,d:0.0026},
+ {e:"🍑",r:44,s:640,d:0.003},
+ {e:"🍍",r:50,s:960,d:0.0032},
+ {e:"🍈",r:56,s:1280,d:0.0035},  
+ {e:"🍉",r:62,s:1640,d:0.004},
+];
+let score=0,highScore=0;
+let current=0,next=0;
+let canDrop=true,gameOver=false;
+let overTimer=0;
+let guideX=180;
+
+World.add(engine.world,[
+ Bodies.rectangle(180,540,360,40,{isStatic:true}),
+ Bodies.rectangle(-10,260,20,520,{isStatic:true}),
+ Bodies.rectangle(370,260,20,520,{isStatic:true}),
+]);
+
+function scale(){
+ const s=Math.min(window.innerWidth/380,window.innerHeight/640,1);
+ wrap.style.transform=`scale(${s})`;
+}
+window.addEventListener("resize",scale);
+scale();
+
+function rand(){return Math.floor(Math.random()*3);}
+
+function updateUI(){
+ scoreEl.textContent=score;
+ highEl.textContent=highScore;
+ currentEl.textContent=fruits[current].e;
+ nextEl.textContent=fruits[next].e;
+ guide.style.left=guideX+"px";
+}
+
+function emojiTex(e,s){
+ const c=document.createElement("canvas");
+ c.width=c.height=s*2;
+ const ctx=c.getContext("2d");
+ ctx.font=`${s}px serif`;
+ ctx.textAlign="center";
+ ctx.textBaseline="middle";
+ ctx.fillText(e,s,s);
+ return c.toDataURL();
+}
+
+function createFruit(x,t,y=40){
+ const f=fruits[t];
+ const b=Bodies.circle(x,y,f.r,{
+  density:f.d,restitution:0.05,friction:0.2,
+  render:{sprite:{texture:emojiTex(f.e,f.r*2)}}
+ });
+ b.fruitType=t;
+ b.isMerging=false;
+ Sleeping.set(b,false);
+ return b;
+}
+
+function drop(){
+ if(!canDrop||gameOver) return;
+ World.add(engine.world,createFruit(guideX,current));
+ current=next;
+ next=rand();
+ updateUI();
+ canDrop=false;
+ setTimeout(()=>canDrop=true,450);
+ save();
+}
+
+function fullReset(){
+ engine.world.bodies
+  .filter(b=>b.fruitType!==undefined)
+  .forEach(b=>World.remove(engine.world,b));
+
+ score=0;
+ gameOver=false;
+ overTimer=0;
+ guide.style.display="block";
+ overEl.style.display="none";
+
+ current=rand();
+ next=rand();
+ updateUI();
+
+ localStorage.removeItem(SAVE_KEY);
+}
+
+function save(){
+ const data=engine.world.bodies
+  .filter(b=>b.fruitType!==undefined)
+  .map(b=>({x:b.position.x,y:b.position.y,t:b.fruitType}));
+ localStorage.setItem(SAVE_KEY,JSON.stringify({
+  score,highScore,current,next,gameOver,data
+ }));
+}
+
+function load(){
+ const d=JSON.parse(localStorage.getItem(SAVE_KEY)||"null");
+ if(!d){current=rand();next=rand();updateUI();return;}
+ score=d.score||0;
+ highScore=d.highScore||0;
+ current=d.current??rand();
+ next=d.next??rand();
+ updateUI();
+ d.data?.forEach(f=>World.add(engine.world,createFruit(f.x,f.t,f.y)));
+}
+
+canvas.addEventListener("pointermove",e=>{
+ if(gameOver) return;
+ const r=canvas.getBoundingClientRect();
+ guideX=Math.max(20,Math.min(340,e.clientX-r.left));
+ updateUI();
+});
+canvas.addEventListener("pointerdown",drop);
+
+document.addEventListener("keydown",e=>{
+ if(e.key==="ArrowLeft"||e.key==="a") guideX=Math.max(20,guideX-10);
+ if(e.key==="ArrowRight"||e.key==="d") guideX=Math.min(340,guideX+10);
+ if(e.key===" "||e.key==="Enter") drop();
+ if(e.key==="r") fullReset();
+ updateUI();
+});
+
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'l') {
+    alert("流石ですね");
+    score += 40000;
+    highScore += 40000;
+    if (highScore >= score){
+        score = highScore;
+        }
+      if (highScore <= score){
+          score = highScore;
+          }
+  }
+});
+
+
+Events.on(engine,"collisionStart",e=>{
+ e.pairs.forEach(p=>{
+  const a=p.bodyA,b=p.bodyB;
+  if(a.fruitType===b.fruitType&&!a.isMerging&&!b.isMerging){
+   a.isMerging=b.isMerging=true;
+   const t=a.fruitType;
+   if(t>=fruits.length-1) return;
+   score+=fruits[t].s;
+   highScore=Math.max(highScore,score);
+   updateUI();
+   const x=(a.position.x+b.position.x)/2;
+   const y=(a.position.y+b.position.y)/2;
+   setTimeout(()=>{
+    World.remove(engine.world,[a,b]);
+    World.add(engine.world,createFruit(x,t+1,y));
+    save();
+   },80);
+  }
+ });
+});
+
+Events.on(engine,"beforeUpdate",()=>{
+ if(gameOver) return;
+ const danger=engine.world.bodies
+  .filter(b=>b.fruitType!==undefined && b.position.y<90);
+ if(danger.length){
+  overTimer+=engine.timing.delta;
+  if(overTimer>800){
+   gameOver=true;
+   guide.style.display="none";
+   overEl.style.display="flex";
+   save();
+  }
+ }else overTimer=0;
+});
+
+document.getElementById("resetBtn").onclick=fullReset;
+load();
+</script>
+</body>
+</html>
