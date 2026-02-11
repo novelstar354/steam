@@ -52,6 +52,7 @@ canvas{display:block;margin:0 auto;background:#000}
 
 <div id="menu">
  <h1>Difficulty Select</h1>
+<div class="div-option" data-d="Safety">Safety</div>
  <div class="div-option" data-d="Easy">Easy</div>
  <div class="div-option" data-d="Normal">Normal</div>
  <div class="div-option" data-d="Hard">Hard</div>
@@ -66,14 +67,6 @@ canvas{display:block;margin:0 auto;background:#000}
 </div>
 
 <canvas id="game"></canvas>
-<script src="../../steam.js"></script>
-<script>
-// 実績例
-unlock("game1","初プレイ");
-
-// ボス倒したら
-// unlock("game1","ボス撃破");
-</script>
 
 <script>
 const canvas=document.getElementById("game");
@@ -82,11 +75,13 @@ canvas.width=480; canvas.height=720;
 
 // ===== 難易度 =====
 const diffData={
+ Safety:{mul:0.4,rate:220,hpMul:0.5},
  Easy:{mul:0.7,rate:120,hpMul:1},
  Normal:{mul:1,rate:90,hpMul:1},
  Hard:{mul:1.4,rate:60,hpMul:1},
  Lunatic:{mul:3,rate:20,hpMul:2}
 };
+
 let DIFF=diffData.Normal;
 
 // ===== メニュー =====
@@ -111,6 +106,13 @@ function selectDifficulty(){
 
 // ===== プレイヤー =====
 const player={x:240,y:620,r:3,lives:3,bomb:3,inv:0,bombing:0};
+// Safetyだけ残機5
+function applySafetyLives(){
+  if(DIFF===diffData.Safety){
+    player.lives = 5;
+  }
+}
+
 let autoFire=false;
 const keys={};
 document.onkeydown=e=>{
@@ -138,15 +140,47 @@ function spiral(x,y,t){let count=DIFF===diffData.Lunatic?24:16;for(let i=0;i<cou
 function rain(){let cnt=DIFF===diffData.Lunatic?30*DIFF.mul:20*DIFF.mul;for(let i=0;i<cnt;i++)enemyBullets.push({x:Math.random()*480,y:0,vx:0,vy:(2+Math.random()*3)*DIFF.mul});}
 function laser(x){lasers.push({x,w:10,t:DIFF===diffData.Lunatic?120:90});}
 
-// ===== 星型スペル弾幕（stage=2） =====
+// ===== 完全星型弾幕 =====
 function starSpell(x,y,t){
- let points = DIFF===diffData.Lunatic?8:5;
- let r = 2 + (DIFF===diffData.Lunatic?1:0);
- for(let i=0;i<points;i++){
-   let angle = i*2*Math.PI/points + t*0.1;
-   enemyBullets.push({x:x+Math.cos(angle)*20, y:y+Math.sin(angle)*20, vx:Math.cos(angle)*r, vy:Math.sin(angle)*r});
- }
+  const points = 5;              // 星の頂点
+  const skip = 2;               // 1個飛ばしで結ぶ（星になる）
+  const radius = 60;
+  const speed = DIFF===diffData.Lunatic ? 3.8 : 2.2;
+
+  // 五角形の頂点を作る
+  let verts=[];
+  for(let i=0;i<points;i++){
+    let a = -Math.PI/2 + i*(Math.PI*2/points);
+    verts.push({
+      x:x + Math.cos(a)*radius,
+      y:y + Math.sin(a)*radius
+    });
+  }
+
+  // 星の線をなぞる弾を発射
+  for(let i=0;i<points;i++){
+    let from = verts[i];
+    let to   = verts[(i+skip)%points];
+
+    let dx = to.x-from.x;
+    let dy = to.y-from.y;
+    let len = Math.hypot(dx,dy);
+
+    let vx = dx/len * speed;
+    let vy = dy/len * speed;
+
+    // 線上に等間隔で弾を置く
+    for(let j=0;j<len;j+=12){
+      enemyBullets.push({
+        x: from.x + vx*j,
+        y: from.y + vy*j,
+        vx: vx,
+        vy: vy
+      });
+    }
+  }
 }
+
 
 // ===== ボス移動 =====
 function moveBoss(){boss.moveTimer++;boss.x+=boss.vx;if(boss.x<60||boss.x>420)boss.vx*=-1;if(boss.moveTimer%120===0)boss.vy=(Math.random()>0.5?1:-1)*2;boss.y+=boss.vy;if(boss.y<80||boss.y>200)boss.vy*=-1;}
@@ -198,7 +232,15 @@ function update(){
  if(boss.active){
   moveBoss();
   // stage2は星型弾幕
-  if(stage===2 && timer%30===0) starSpell(boss.x,boss.y,timer);
+  // 2体目以降は常時星弾幕
+if(stage>=2 && timer%(DIFF===diffData.Safety?90:22)===0){
+
+  let interval = DIFF===diffData.Safety ? 90 : 30;
+  if(timer%interval===0){
+    starSpell(boss.x,boss.y,timer);
+  }
+}
+
   if(timer%DIFF.rate===0) circle(boss.x,boss.y,DIFF===diffData.Lunatic?60*DIFF.mul:48*DIFF.mul,2.2*DIFF.mul);
   if(timer%(DIFF===diffData.Lunatic?15:20)===0) spiral(boss.x,boss.y,timer);
   if(timer%(DIFF===diffData.Lunatic?60:80)===0) rain();
@@ -209,8 +251,10 @@ function update(){
  enemyBullets.forEach(b=>{b.x+=b.vx;b.y+=b.vy;}); enemyBullets=enemyBullets.filter(b=>b.y<720&&b.x>-20&&b.x<500);
  lasers.forEach(l=>l.t--); lasers=lasers.filter(l=>l.t>0);
 
- enemyBullets.forEach(b=>{let dx=b.x-player.x,dy=b.y-player.y;if(dx*dx+dy*dy<player.r*player.r && player.inv<=0){player.lives=Math.max(0,player.lives-1);player.inv=120;enemyBullets=[];effect(player.x,player.y,80);}});
- lasers.forEach(l=>{if(player.x>l.x-6 && player.x<l.x+6 && player.inv<=0){player.lives=Math.max(0,player.lives-1);player.inv=120;effect(player.x,player.y,60);}});
+ enemyBullets.forEach(b=>{let dx=b.x-player.x,dy=b.y-player.y;if(dx*dx+dy*dy<player.r*player.r && player.inv<=0){player.lives=Math.max(0,player.lives-1);player.inv = DIFF===diffData.Safety ? 240 : 120;
+;enemyBullets=[];effect(player.x,player.y,80);}});
+ lasers.forEach(l=>{if(player.x>l.x-6 && player.x<l.x+6 && player.inv<=0){player.lives=Math.max(0,player.lives-1);player.inv = DIFF===diffData.Safety ? 240 : 120;
+effect(player.x,player.y,60);}});
 
  if(player.lives===0){showOverlay("gameover");return;}
 
@@ -221,7 +265,8 @@ function update(){
   stage++;
   score+=1000;
   let hpBase = DIFF===diffData.Lunatic ? 3000 : 1500;
-  boss.maxHp = hpBase + (stage-1)*(DIFF===diffData.Lunatic?2000:1000);
+  boss.maxHp = (hpBase + (stage-1)*(DIFF===diffData.Lunatic?2000:1000)) * DIFF.hpMul;
+
   boss.hp = boss.maxHp;
   boss.active=false;
   timer=0;
@@ -262,6 +307,68 @@ function overlayLoop(){
 }
 
 function loop(){update();draw();requestAnimationFrame(loop);}
+// ===== 入力改善 =====
+let touchX=240,touchY=600,touching=false;
+canvas.addEventListener("touchstart",e=>{
+ touching=true;
+ const r=canvas.getBoundingClientRect();
+ touchX=e.touches[0].clientX-r.left;
+ touchY=e.touches[0].clientY-r.top;
+});
+canvas.addEventListener("touchmove",e=>{
+ const r=canvas.getBoundingClientRect();
+ touchX=e.touches[0].clientX-r.left;
+ touchY=e.touches[0].clientY-r.top;
+});
+canvas.addEventListener("touchend",()=>touching=false);
+
+// Zキー常時連射
+document.addEventListener("keydown",e=>{
+ if(e.key==='z') autoFire=true;
+});
+document.addEventListener("keyup",e=>{
+ if(e.key==='z') autoFire=false;
+});
+
+// ===== Lunatic専用・狂気弾幕 =====
+function lunaticHell(x,y,t){
+ for(let i=0;i<80;i++){
+   let a=i*Math.PI*2/80 + t*0.03;
+   let spd=2+Math.sin(t*0.1+i)*2;
+   enemyBullets.push({x,y,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd});
+ }
+}
+
+// ===== Update改造 =====
+const oldUpdate = update;
+update = function(){
+ oldUpdate();
+
+ // スマホ移動
+ if(touching){
+   player.x += (touchX-player.x)*0.15;
+   player.y += (touchY-player.y)*0.15;
+ }
+
+ // ZまたはXで常時連射
+ if(autoFire && timer%4===0) shoot6();
+
+ // Shift低速＝当たり判定小
+ player.r = keys['Shift']?3:6;
+
+ // Lunaticだけ追加弾幕
+ if(boss.active && DIFF===diffData.Lunatic && timer%25===0){
+   lunaticHell(boss.x,boss.y,timer);
+ }
+
+ // 画面外制限
+ player.x=Math.max(10,Math.min(470,player.x));
+ player.y=Math.max(10,Math.min(710,player.y));
+}
+
+// ===== Overlayアニメ起動 =====
+overlayLoop();
+
 </script>
 </body>
 </html>
